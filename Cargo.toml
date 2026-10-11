@@ -5,10 +5,25 @@ edition = "2021"
 rust-version = "1.83"
 license = "MIT OR Apache-2.0"
 description = "Loopback TCP sockets and a blocking HTTP/1.1 client for WASI programs in slicc's kernel"
-publish = false
+repository = "https://github.com/ai-ecoverse/wasix-net"
+homepage = "https://github.com/ai-ecoverse/wasix-net"
+readme = "README.md"
+keywords = ["wasi", "http", "tcp", "wasm", "proxy"]
+categories = ["network-programming", "web-programming"]
+publish = true
+exclude = [
+  ".github/",
+  "test/",
+  "scripts/",
+  "package.json",
+  "package-lock.json",
+  "lefthook.yml",
+  "biome.json",
+  "renovate.json",
+  ".releaserc.json",
+]
 
 [features]
-# Response::into_json and Request::send_json.
 json = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
@@ -16,6 +31,9 @@ serde = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
-# The tests use the json feature.
-wasix-net = { path = ".", features = ["json"] }
 serde_json = "1"
+
+[[bin]]
+name = "wasix-net-http"
+path = "src/bin/wasix-net-http.rs"
+required-features = ["json"]

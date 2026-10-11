@@ -1,0 +1,24 @@
+{
+  "name": "wasix-net",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Release tooling and the in-kernel HTTP test for the wasix-net crate",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "prepare": "lefthook install && node scripts/allow-rust-tests.mjs",
+    "lint": "slicc-lint",
+    "test": "true",
+    "test:kernel": "node --test --test-concurrency=1 test/integration/*.test.mjs"
+  },
+  "devDependencies": {
+    "@ai-ecoverse/slicc-kernel": "1.56.0",
+    "@ai-ecoverse/slicc-shared-web": "1.12.1",
+    "@biomejs/biome": "2.5.15",
+    "lefthook": "2.1.16",
+    "semantic-release": "25.0.9"
+  }
+}
