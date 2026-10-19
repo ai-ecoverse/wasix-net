@@ -133,6 +133,12 @@ fn dup(file: &File) -> io::Result<File> {
     Ok(unsafe { File::from_raw_fd(out as RawFd) })
 }
 
+fn nonblocking(file: &File) -> io::Result<bool> {
+    let mut stat = [0u8; 24];
+    cvt(unsafe { sys::fd_fdstat_get(fd_of(file), stat.as_mut_ptr()) })?;
+    Ok(u16::from_le_bytes([stat[2], stat[3]]) & FDFLAGS_NONBLOCK != 0)
+}
+
 fn set_nonblocking(file: &File, on: bool) -> io::Result<()> {
     // fdstat: filetype u8, then the flags (u16) at 2.
     let mut stat = [0u8; 24];
@@ -453,7 +459,9 @@ impl TcpStream {
 impl Read for &TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if let Some(timeout) = load_timeout(&self.read_timeout) {
-            wait(fd_of(&self.file), false, timeout)?;
+            if !nonblocking(&self.file)? {
+                wait(fd_of(&self.file), false, timeout)?;
+            }
         }
         (&self.file).read(buf)
     }
@@ -462,7 +470,9 @@ impl Read for &TcpStream {
 impl Write for &TcpStream {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if let Some(timeout) = load_timeout(&self.write_timeout) {
-            wait(fd_of(&self.file), true, timeout)?;
+            if !nonblocking(&self.file)? {
+                wait(fd_of(&self.file), true, timeout)?;
+            }
         }
         (&self.file).write(buf)
     }
