@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 version=$1
+cargo fetch --locked
 node scripts/set-crate-version.mjs "$version"
 cargo update --offline -p wasix-net
 attempt=1
