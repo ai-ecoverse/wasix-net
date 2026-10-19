@@ -63,7 +63,7 @@ jobs:
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - run: npm ci
       - name: Build
-        run: cargo build --locked --release --features json --bin wasix-net-http --target ${{ matrix.target }}
+        run: cargo build --locked --release --features json --bin wasix-net-http --example nonblocking --target ${{ matrix.target }}
       - name: Kernel HTTP test
         env:
           WASIX_NET_HTTP_WASM: ${{ github.workspace }}/target/${{ matrix.target }}/release/wasix-net-http.wasm

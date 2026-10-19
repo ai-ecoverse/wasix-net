@@ -13,6 +13,8 @@ On `wasm32-wasip1` and `wasm32-wasip1-threads`, `TcpStream`, `TcpListener`, and 
 
 `resolve` answers `localhost` and literal addresses in the realm. Elsewhere it is the system resolver.
 
+A non-blocking socket never waits for a configured read or write timeout: if it is not ready, I/O returns `WouldBlock` immediately. The live descriptor flags determine that behaviour. Switching back to blocking mode preserves the configured timeouts. `examples/nonblocking.rs` exercises this boundary inside the kernel on both WASI targets.
+
 There is no TLS. An `https://` URL is sent to the proxy named by `https_proxy`, `http_proxy`, or `all_proxy` (either case) in absolute form (`GET https://example.com/ HTTP/1.1`), and that proxy does TLS. With no proxy, `https://` is an error. `https://` and SOCKS proxy URLs are errors too. Hosts in `no_proxy` are dialed directly. The kernel's `no_proxy` is `localhost,.localhost,127.0.0.1,127.0.0.0/8`, which is how a program reaches the realm's own loopback: the kernel's proxy refuses that loopback, and the client honours `no_proxy`.
 
 ```rust
