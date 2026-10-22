@@ -2,78 +2,90 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
   push:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
+  actions: read
+  issues: write
+  pull-requests: write
+  statuses: write
+  id-token: write
+  attestations: write
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  lint:
-    uses: ai-ecoverse/slicc-shared-web/.github/workflows/node-ci.yml@v1.30.8
+  ci:
+    uses: ai-ecoverse/slicc-shared-web/.github/workflows/pipeline.yml@v2.8.4
+    secrets: inherit
     with:
-      chromium: false
-  host:
+      test-glob: test/integration/*.test.mjs
+      shards: 4
+      timeout-minutes: 30
+      review-prompt: |
+        WASIX-NET
+
+        This repository is the `wasix-net` crate on crates.io: loopback TCP sockets and a blocking HTTP/1.1 client for WASI programs in slicc's kernel. `wasm32-wasip1` and `wasm32-wasip1-threads` use WASIX sockets, every other target uses std. There is no TLS: `https://` goes through the kernel's proxy, and `no_proxy` dials loopback directly. AGENTS.md and the README are the contract. `git diff origin/main...HEAD`, or `$RUNNER_TEMP/review/context/pr.diff`, is the change.
+
+        Once this pull request passes the merge queue, semantic-release tags it on `main` and the `crates` job publishes it to crates.io. Review it as the last check before it ships.
+
+        Look for real defects, in this order:
+        1. Network policy: nothing dials a non-loopback host directly, `https://` always goes through the proxy, and a missing proxy fails with a clear error.
+        2. HTTP/1.1 correctness: request framing, chunked and length-delimited bodies, redirects, headers, and reads that never end.
+        3. Socket semantics on both WASI targets: non-blocking reads, timeouts, and descriptor flags.
+        4. The public API, the `json` feature and MSRV 1.83.
+        5. Tests: every behaviour change has a Rust test or a kernel test in `test/integration/`, and a fix's test fails without the fix.
+        6. Repo rules: no comments anywhere, no unit tests in git, and a conventional-commit title.
+
+        `cargo test --locked --features json` runs the host tests. `node --test test/integration/wasm32-wasip1.test.mjs` builds `wasix-net-http` and runs it in the kernel. Don't report style preferences, or anything you haven't confirmed in the code or by a run.
+
+        Severity: deny for a confirmed P1 or P2: a direct dial to a remote host, a crash or hang in the kernel, a break of the public API, or a behaviour change without its test. A narrow problem with a workaround is P3: comment with a repro and approve.
+
+  released:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        toolchain: ['1.83.0', stable]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Install Rust
-        run: |
-          curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable --component clippy --component rustfmt --target wasm32-wasip1 --target wasm32-wasip1-threads
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - name: Install MSRV
-        if: matrix.toolchain == '1.83.0'
-        run: rustup toolchain install 1.83.0 --profile minimal
-      - name: Test
-        run: cargo +${{ matrix.toolchain }} test --locked --features json
-      - name: Format and lints
-        if: matrix.toolchain == 'stable'
-        run: |
-          cargo fmt --check
-          cargo clippy --locked --all-targets --all-features -- -D warnings
-          cargo clippy --locked --all-features --target wasm32-wasip1 -- -D warnings
-          cargo clippy --locked --all-features --target wasm32-wasip1-threads -- -D warnings
-      - name: Rehearse crate publication with a fresh registry cache
-        if: matrix.toolchain == 'stable'
-        env:
-          CARGO_HOME: ${{ runner.temp }}/cargo-publish-dry-run
-        run: |
-          cargo fetch --locked
-          node scripts/set-crate-version.mjs 0.1.2
-          cargo update --offline -p wasix-net
-          cargo publish --dry-run --locked --allow-dirty
-  kernel:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [wasm32-wasip1, wasm32-wasip1-threads]
-    env:
-      LEFTHOOK: '0'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 24
-          cache: npm
-      - name: Install Rust
+          persist-credentials: false
+
+      - id: version
         run: |
-          curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable --target wasm32-wasip1 --target wasm32-wasip1-threads
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-      - run: npm ci
-      - name: Build
-        run: cargo build --locked --release --features json --bin wasix-net-http --example nonblocking --target ${{ matrix.target }}
-      - name: Kernel HTTP test
-        env:
-          WASIX_NET_HTTP_WASM: ${{ github.workspace }}/target/${{ matrix.target }}/release/wasix-net-http.wasm
-        run: npm run test:kernel
+          git fetch --tags --force --quiet origin
+          version=$(git tag --points-at HEAD --list 'v*' | sed 's/^v//' | sort -V | tail -1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release: ${version:-none} at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+  crates:
+    needs: released
+    if: needs.released.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9
+        id: auth
+
+      - env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          VERSION: ${{ needs.released.outputs.version }}
+        run: sh scripts/publish-crate.sh "$VERSION"

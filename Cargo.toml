@@ -13,6 +13,7 @@ categories = ["network-programming", "web-programming"]
 publish = true
 exclude = [
   ".github/",
+  ".githooks/",
   "test/",
   "scripts/",
   "package.json",

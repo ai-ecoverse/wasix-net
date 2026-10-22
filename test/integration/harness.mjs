@@ -1,11 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { createNodeKernel } from '@ai-ecoverse/slicc-kernel/node';
-
-const wasmPath =
-  process.env.WASIX_NET_HTTP_WASM ??
-  fileURLToPath(new URL('../../target/wasm32-wasip1/release/wasix-net-http.wasm', import.meta.url));
 
 const manifest = {
   name: 'wasix-net-http',
@@ -16,18 +11,18 @@ const manifest = {
   },
 };
 
-export async function kernelWithHttp(options = {}) {
+export async function kernelWithHttp(dir, options = {}) {
   const kernel = await createNodeKernel(options);
   await kernel.writeFile('/node_modules/wasix-net-http/package.json', JSON.stringify(manifest));
   await kernel.writeFile(
     '/node_modules/wasix-net-http/bin/wasix-net-http.wasm',
-    await readFile(wasmPath)
+    await readFile(join(dir, 'wasix-net-http.wasm'))
   );
   await kernel.writeFile('/tmp/.keep', '');
   return kernel;
 }
 
-export async function kernelWithNonblocking() {
+export async function kernelWithNonblocking(dir) {
   const kernel = await createNodeKernel();
   const pkg = '/node_modules/wasix-net-nonblocking';
   await kernel.writeFile(
@@ -42,9 +37,7 @@ export async function kernelWithNonblocking() {
   );
   await kernel.writeFile(
     `${pkg}/bin/nonblocking.wasm`,
-    await readFile(
-      process.env.WASIX_NET_NONBLOCK_WASM ?? join(dirname(wasmPath), 'examples/nonblocking.wasm')
-    )
+    await readFile(join(dir, 'examples/nonblocking.wasm'))
   );
   return kernel;
 }
