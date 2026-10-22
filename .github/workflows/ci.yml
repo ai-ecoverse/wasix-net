@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   lint:
-    uses: ai-ecoverse/slicc-shared-web/.github/workflows/node-ci.yml@v1.30.5
+    uses: ai-ecoverse/slicc-shared-web/.github/workflows/node-ci.yml@v1.30.8
     with:
       chromium: false
   host:
