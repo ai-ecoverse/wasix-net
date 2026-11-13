@@ -11,7 +11,7 @@
   "scripts": {
     "prepare": "slicc-install-hooks && node scripts/allow-rust-tests.mjs",
     "lint": "slicc-lint && npm run -s lint:rust",
-    "lint:rust": "export PATH=\"$HOME/.cargo/bin:$PATH\" && rustup toolchain install stable --profile minimal && rustup component add --toolchain stable clippy rustfmt && rustup target add --toolchain stable wasm32-wasip1 wasm32-wasip1-threads && cargo +stable fmt --check && cargo +stable clippy --locked --all-targets --all-features -- -D warnings && cargo +stable clippy --locked --all-features --target wasm32-wasip1 -- -D warnings && cargo +stable clippy --locked --all-features --target wasm32-wasip1-threads -- -D warnings",
+    "lint:rust": "export PATH=\"$HOME/.cargo/bin:$PATH\" && (rustup run stable rustc --version >/dev/null 2>&1 || rustup toolchain install stable --profile minimal) && rustup component add --toolchain stable clippy rustfmt && rustup target add --toolchain stable wasm32-wasip1 wasm32-wasip1-threads && cargo +stable fmt --check && cargo +stable clippy --locked --all-targets --all-features -- -D warnings && cargo +stable clippy --locked --all-features --target wasm32-wasip1 -- -D warnings && cargo +stable clippy --locked --all-features --target wasm32-wasip1-threads -- -D warnings",
     "test": "node --test --test-concurrency=1 'test/integration/*.test.mjs'"
   },
   "devDependencies": {
