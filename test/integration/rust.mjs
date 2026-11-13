@@ -34,7 +34,9 @@ export function must(command, args, options) {
 }
 
 export function toolchain(name, { target = [] } = {}) {
-  must('rustup', ['toolchain', 'install', name, '--profile', 'minimal']);
+  if (run('rustup', ['run', name, 'rustc', '--version']).status !== 0) {
+    must('rustup', ['toolchain', 'install', name, '--profile', 'minimal']);
+  }
   if (target.length) must('rustup', ['target', 'add', '--toolchain', name, ...target]);
 }
 
